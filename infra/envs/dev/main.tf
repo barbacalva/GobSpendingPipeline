@@ -20,19 +20,33 @@ module "s3_raw" {
   enable_versioning = true
 }
 
-module "s3_curated" {
+module "s3_lake" {
   source            = "../../modules/s3_bucket"
-  name              = "spendings-curated-${var.stage}"
+  name              = "spendings-lake-${var.stage}"
   tags              = local.common_tags
   enable_versioning = false
 }
 
-module "lambda_smoke" {
+resource "aws_dynamodb_table" "igae_files" {
+  name         = "igae_downloads-${var.stage}"
+  hash_key     = "file_id"
+  billing_mode = "PAY_PER_REQUEST"
+
+  attribute {
+    name = "file_id"
+    type = "S"
+  }
+
+  tags = local.common_tags
+}
+
+module "lambda_igae_pull" {
   source         = "../../modules/lambda"
-  function_name  = "gob-spending-smoke-writer"
-  source_dir     = "../../../src"
+  function_name  = "igae-pull-${var.stage}"
+  source_dir     = "../../../src/lambdas/igae_pull"
   stage          = var.stage
   target_bucket  = module.s3_raw.bucket_id
   target_bucket_arn  = module.s3_raw.bucket_arn
+  dynamodb_table = aws_dynamodb_table.igae_files.name
   tags           = local.common_tags
 }
